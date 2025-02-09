@@ -1,0 +1,2 @@
+# zh - Fast ssh manager
+
