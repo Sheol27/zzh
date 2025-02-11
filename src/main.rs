@@ -50,7 +50,7 @@ fn list_hosts() -> Result<(), Box<dyn Error>> {
 #[command(author, version, about, long_about = None)]
 struct Cli {
     /// The target host to connect to
-    #[arg(required_unless_present_any = ["list"])]
+    #[arg(required_unless_present_any = ["hosts"])]
     target: Option<String>,
 
     ///  Instanciate the socket without interactive shell
@@ -59,7 +59,7 @@ struct Cli {
 
     /// List hosts from ssh config
     #[arg(long)]
-    list: bool,
+    hosts: bool,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -69,17 +69,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         fs::create_dir(FOLDER)?;
     }
 
-    if cli.list {
+    if cli.hosts {
         list_hosts()?;
         return Ok(());
     }
 
-    let target = cli.target.expect("No target specified");
-
-    smol::block_on(async {
-        interactive_session(&target, cli.detached)?;
-        Ok::<(), Box<dyn Error>>(())
-    })?;
+    if let Some(target) = cli.target {
+        smol::block_on(async {
+            interactive_session(&target, cli.detached)?;
+            Ok::<(), Box<dyn Error>>(())
+        })?;
+    }
 
     Ok(())
 }
