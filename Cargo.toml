@@ -2,6 +2,15 @@
 name = "zzh"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+authors = ["Daniel Pavalache <danielpavalache27@gmail.com>"]
+description = """
+ZZH is a cli tool that wraps SSH. It's not a drop in replacement, 
+just a more enjoyable way of managing connections
+""""
+homepage = "https://github.com/Sheol27/zzh"
+repository = "https://github.com/Sheol27/zzh"
+
 
 [dependencies]
 clap = { version = "4.5.28", features = ["derive"] }
