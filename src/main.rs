@@ -97,10 +97,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     if let Some(target) = cli.target {
-        smol::block_on(async {
-            interactive_session(&target, cli.detached, zzh_folder_string)?;
-            Ok::<(), Box<dyn Error>>(())
-        })?;
+        interactive_session(&target, cli.detached, zzh_folder_string)?;
     } else {
         let hosts = extract_hosts()?;
 
