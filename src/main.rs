@@ -1,11 +1,12 @@
 use clap::Parser;
+use dialoguer::theme::ColorfulTheme;
+use dialoguer::FuzzySelect;
 use regex::Regex;
-use std::env::var;
+use std::env::{self, var};
 use std::error::Error;
-use std::fs;
+use std::fs::{self, File};
+use std::io::Read;
 use std::path::{Path, PathBuf};
-
-static FOLDER: &str = "/tmp/zh";
 
 /// Returns the path to the SSH config file (currently `$HOME/.ssh/config`)
 fn find_config() -> Result<PathBuf, std::env::VarError> {
@@ -13,13 +14,31 @@ fn find_config() -> Result<PathBuf, std::env::VarError> {
     Ok(Path::new(&home).join(".ssh").join("config"))
 }
 
+/// Extract list of hosts from ssh config file
+fn extract_hosts() -> Result<Vec<String>, Box<dyn Error>> {
+    let config_path = find_config()?;
+    let mut file = File::open(&config_path)?;
+
+    let mut s = String::new();
+    file.read_to_string(&mut s)?;
+
+    let re = Regex::new(r"Host\s+(\S+)").unwrap();
+
+    let hosts: Vec<String> = re
+        .captures_iter(&s)
+        .filter_map(|cap| cap.get(1).map(|m| m.as_str().to_string()))
+        .collect();
+
+    Ok(hosts)
+}
+
 /// Runs an interactive ssh session that opens a TTY on the remote host.
-fn interactive_session(target: &str, detached: bool) -> Result<(), Box<dyn Error>> {
+fn interactive_session(target: &str, detached: bool, folder: &str) -> Result<(), Box<dyn Error>> {
     let mut command = std::process::Command::new("ssh");
 
     command
         .args(&["-o", "ControlMaster=auto"])
-        .args(&["-o", &format!("ControlPath={FOLDER}/%r@%h:%p")])
+        .args(&["-o", &format!("ControlPath={folder}/%r@%h:%p")])
         .args(&["-o", "ControlPersist=yes"]);
 
     if detached {
@@ -50,7 +69,6 @@ fn list_hosts() -> Result<(), Box<dyn Error>> {
 #[command(author, version, about, long_about = None)]
 struct Cli {
     /// The target host to connect to
-    #[arg(required_unless_present_any = ["hosts"])]
     target: Option<String>,
 
     ///  Instanciate the socket without interactive shell
@@ -65,8 +83,12 @@ struct Cli {
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
 
-    if !Path::new(FOLDER).exists() {
-        fs::create_dir(FOLDER)?;
+    let home_dir = env::var("HOME").expect("Could not determine the home directory");
+    let zzh_folder = Path::new(&home_dir).join(".zzh");
+    let zzh_folder_string = zzh_folder.to_str().unwrap();
+
+    if !zzh_folder.exists() {
+        fs::create_dir(&zzh_folder)?;
     }
 
     if cli.hosts {
@@ -76,9 +98,19 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     if let Some(target) = cli.target {
         smol::block_on(async {
-            interactive_session(&target, cli.detached)?;
+            interactive_session(&target, cli.detached, zzh_folder_string)?;
             Ok::<(), Box<dyn Error>>(())
         })?;
+    } else {
+        let hosts = extract_hosts()?;
+
+        let selection = FuzzySelect::with_theme(&ColorfulTheme::default())
+            .default(0)
+            .highlight_matches(true)
+            .items(&hosts)
+            .interact()
+            .unwrap();
+        interactive_session(&hosts[selection], cli.detached, zzh_folder_string)?;
     }
 
     Ok(())
