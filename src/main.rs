@@ -1,17 +1,70 @@
+use chrono::prelude::*;
 use clap::Parser;
+use dialoguer::console::Style;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::FuzzySelect;
 use regex::Regex;
+use std::collections::HashMap;
 use std::env::{self, var};
 use std::error::Error;
-use std::fs::{self, File};
-use std::io::Read;
+use std::fs::{self, File, OpenOptions};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+
+const HISTORY_FILE: &str = "history";
 
 /// Returns the path to the SSH config file (currently `$HOME/.ssh/config`)
 fn find_config() -> Result<PathBuf, std::env::VarError> {
     let home = var("HOME")?;
     Ok(Path::new(&home).join(".ssh").join("config"))
+}
+
+/// Extract connections history
+fn extract_history(
+    history_folder: &PathBuf,
+) -> Result<Vec<(String, DateTime<Utc>)>, Box<dyn Error>> {
+    let mut file = File::open(&history_folder.join(HISTORY_FILE))?;
+
+    let mut s = String::new();
+    file.read_to_string(&mut s)?;
+
+    let data: Vec<(DateTime<Utc>, &str)> = s
+        .lines()
+        .map(|l| {
+            let mut split = l.split(" ");
+
+            let dt_str = split
+                .next()
+                .expect("Missing timestamp while processiing history");
+            let target_str = split.next().expect("Missing host while processing history");
+
+            let now_parsed: DateTime<Utc> = dt_str.parse().unwrap();
+
+            (now_parsed, target_str)
+        })
+        .collect();
+
+    let mut latest_entries: HashMap<&str, DateTime<Utc>> = HashMap::new();
+
+    for (datetime, key) in data {
+        latest_entries
+            .entry(key)
+            .and_modify(|existing| {
+                if *existing < datetime {
+                    *existing = datetime;
+                }
+            })
+            .or_insert(datetime);
+    }
+
+    let mut sorted_vec: Vec<(String, DateTime<Utc>)> = latest_entries
+        .into_iter()
+        .map(|(key, datetime)| (key.to_string(), datetime))
+        .collect();
+
+    sorted_vec.sort_by(|a, b| b.1.cmp(&a.1));
+
+    Ok(sorted_vec)
 }
 
 /// Extract list of hosts from ssh config file
@@ -33,17 +86,24 @@ fn extract_hosts() -> Result<Vec<String>, Box<dyn Error>> {
 }
 
 /// Runs an interactive ssh session that opens a TTY on the remote host.
-fn interactive_session(target: &str, detached: bool, folder: &str) -> Result<(), Box<dyn Error>> {
+fn interactive_session(
+    target: &str,
+    detached: bool,
+    folder: &PathBuf,
+) -> Result<(), Box<dyn Error>> {
     let mut command = std::process::Command::new("ssh");
+    let str_folder = folder.to_str().unwrap();
 
     command
         .args(&["-o", "ControlMaster=auto"])
-        .args(&["-o", &format!("ControlPath={folder}/%r@%h:%p")])
+        .args(&["-o", &format!("ControlPath={str_folder}/%r@%h:%p")])
         .args(&["-o", "ControlPersist=yes"]);
 
     if detached {
         command.arg("-fN").arg("-T");
     }
+
+    append_to_history(&folder, target)?;
     let status = command.arg(target).status()?;
     if !status.success() {
         Err("ssh exited with an error")?
@@ -71,7 +131,7 @@ struct Cli {
     /// The target host to connect to
     target: Option<String>,
 
-    ///  Instanciate the socket without interactive shell
+    /// Instantiate the socket without interactive shell
     #[arg(long)]
     detached: bool,
 
@@ -80,12 +140,27 @@ struct Cli {
     hosts: bool,
 }
 
+/// Append connection to history with datetime
+fn append_to_history(history_folder: &PathBuf, host: &str) -> Result<(), Box<dyn Error>> {
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&history_folder.join(HISTORY_FILE))
+        .unwrap();
+
+    let dt_now = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+    if let Err(e) = writeln!(file, "{dt_now} {host}") {
+        eprintln!("Couldn't write to file: {}", e);
+    }
+
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
 
     let home_dir = env::var("HOME").expect("Could not determine the home directory");
     let zzh_folder = Path::new(&home_dir).join(".zzh");
-    let zzh_folder_string = zzh_folder.to_str().unwrap();
 
     if !zzh_folder.exists() {
         fs::create_dir(&zzh_folder)?;
@@ -97,17 +172,35 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     if let Some(target) = cli.target {
-        interactive_session(&target, cli.detached, zzh_folder_string)?;
+        interactive_session(&target, cli.detached, &zzh_folder)?;
     } else {
-        let hosts = extract_hosts()?;
+        let mut hosts = extract_hosts()?;
+        let history = extract_history(&zzh_folder)?;
 
-        let selection = FuzzySelect::with_theme(&ColorfulTheme::default())
+        hosts.retain(|x| !history.iter().any(|(key, _)| x == key));
+
+        let mut options: Vec<String> = history
+            .iter()
+            .map(|(key, datetime)| format!("{} \x1b[90m({})\x1b[0m", key, datetime))
+            .collect();
+
+        for host in &hosts {
+            options.push(host.clone());
+        }
+
+        let mut theme = ColorfulTheme::default();
+
+        // FIXME: this is just a workaround, otherwise the datetime styling doesn't work.
+        theme.active_item_style = Style::new();
+
+        let selection = FuzzySelect::with_theme(&theme)
             .default(0)
             .highlight_matches(true)
-            .items(&hosts)
+            .items(&options)
             .interact()
             .unwrap();
-        interactive_session(&hosts[selection], cli.detached, zzh_folder_string)?;
+
+        interactive_session(&options[selection], cli.detached, &zzh_folder)?;
     }
 
     Ok(())
