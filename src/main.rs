@@ -179,15 +179,21 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         hosts.retain(|x| !history.iter().any(|(key, _)| x == key));
 
-        let mut options: Vec<String> = history
+        let mut options: Vec<(String, String)> = history
             .iter()
-            .map(|(key, datetime)| format!("{} \x1b[90m({})\x1b[0m", key, datetime))
+            .map(|(key, datetime)| {
+                (
+                    key.clone(),
+                    format!("{} \x1b[90m({})\x1b[0m", key, datetime),
+                )
+            })
             .collect();
 
         for host in &hosts {
-            options.push(host.clone());
+            options.push((host.clone(), host.clone()));
         }
 
+        let display_options: Vec<&str> = options.iter().map(|opt| opt.1.as_str()).collect();
         let mut theme = ColorfulTheme::default();
 
         // FIXME: this is just a workaround, otherwise the datetime styling doesn't work.
@@ -196,11 +202,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         let selection = FuzzySelect::with_theme(&theme)
             .default(0)
             .highlight_matches(true)
-            .items(&options)
+            .items(&display_options)
             .interact()
             .unwrap();
 
-        interactive_session(&options[selection], cli.detached, &zzh_folder)?;
+        interactive_session(&options[selection].0, cli.detached, &zzh_folder)?;
     }
 
     Ok(())
