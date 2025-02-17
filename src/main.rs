@@ -23,10 +23,17 @@ fn find_config() -> Result<PathBuf, std::env::VarError> {
 fn extract_history(
     history_folder: &PathBuf,
 ) -> Result<Vec<(String, DateTime<Utc>)>, Box<dyn Error>> {
-    let mut file = File::open(&history_folder.join(HISTORY_FILE))?;
+    let file_path = &history_folder.join(HISTORY_FILE);
 
     let mut s = String::new();
-    file.read_to_string(&mut s)?;
+    match File::open(file_path) {
+        Ok(mut f) => {
+            f.read_to_string(&mut s)?;
+        }
+        Err(_) => {
+            File::create(file_path)?;
+        }
+    };
 
     let data: Vec<(DateTime<Utc>, &str)> = s
         .lines()
