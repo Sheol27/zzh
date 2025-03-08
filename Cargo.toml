@@ -15,5 +15,6 @@ repository = "https://github.com/Sheol27/zzh"
 [dependencies]
 chrono = "0.4.39"
 clap = { version = "4.5.28", features = ["derive"] }
+ctrlc = "3.4.5"
 dialoguer = { version = "0.11.0", features = ["fuzzy-select"] }
 regex = "1.11.1"

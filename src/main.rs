@@ -1,6 +1,7 @@
 use chrono::prelude::*;
 use clap::Parser;
 use dialoguer::console::Style;
+use dialoguer::console::Term;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::FuzzySelect;
 use regex::Regex;
@@ -165,6 +166,7 @@ fn append_to_history(history_folder: &PathBuf, host: &str) -> Result<(), Box<dyn
 
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
+    ctrlc::set_handler(move || {}).expect("Error setting Ctrl-C handler");
 
     let home_dir = env::var("HOME").expect("Could not determine the home directory");
     let zzh_folder = Path::new(&home_dir).join(".zzh");
@@ -206,14 +208,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         // FIXME: this is just a workaround, otherwise the datetime styling doesn't work.
         theme.active_item_style = Style::new();
 
+        let term = Term::stdout();
         let selection = FuzzySelect::with_theme(&theme)
             .default(0)
             .highlight_matches(true)
             .items(&display_options)
-            .interact()
-            .unwrap();
+            .interact_on(&term);
 
-        interactive_session(&options[selection].0, cli.detached, &zzh_folder)?;
+        match selection {
+            Ok(value) => interactive_session(&options[value].0, cli.detached, &zzh_folder)?,
+            Err(_) => {
+                let _ = Term::stderr().show_cursor();
+                ()
+            }
+        }
     }
 
     Ok(())
