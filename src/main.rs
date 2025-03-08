@@ -11,6 +11,7 @@ use std::error::Error;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::{thread, time};
 
 const HISTORY_FILE: &str = "history";
 
@@ -110,12 +111,23 @@ fn interactive_session(
     if detached {
         command.arg("-fN").arg("-T");
     }
-
+    command.arg(target);
     append_to_history(&folder, target)?;
-    let status = command.arg(target).status()?;
-    if !status.success() {
-        Err("ssh exited with an error")?
+
+    let mut attempts = 0;
+    loop {
+        let status = command.status()?;
+        let exit_code = status.code().unwrap();
+
+        if status.success() && exit_code != 255 {
+            break;
+        }
+
+        thread::sleep(time::Duration::from_millis(1000));
+        attempts += 1;
+        println!("Trying to reconnect... {} attempt", attempts);
     }
+
     Ok(())
 }
 
