@@ -1,5 +1,7 @@
 # ZZH - Improved SSH experience
 
+[![Crates.io](https://img.shields.io/crates/v/zzh)](https://crates.io/crates/zzh)
+
 ZZH is a cli tool that wraps SSH. It's not a drop in replacement, just a more enjoyable way of managing connections
 
 ## Features
