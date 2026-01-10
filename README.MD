@@ -8,6 +8,7 @@ ZZH is a cli tool that wraps SSH. It's not a drop in replacement, just a more en
 - **Connection History:** Automatically tracks your recent SSH connections for easy access.
 - **Detached Sessions:** Option to start sessions in detached mode (no interactive shell).
 - **SSH Config Integration:** Reads your existing SSH configuration from `~/.ssh/config` to list available hosts.
+- **Shell Completions:** Tab completion support for bash, zsh, and fish with history-aware suggestions.
 - **Simple & Fast:** Built with performance and usability in mind.
 
 ## Installation
@@ -76,6 +77,25 @@ To list all hosts defined in your SSH configuration:
 ```bash
 zzh --hosts
 ```
+
+### Shell Completions
+
+ZZH supports tab completion for bash, zsh, and fish shells. Completions suggest hosts from both your connection history (sorted by recency) and your SSH config.
+
+To generate completions for your shell:
+
+```bash
+# Bash
+zzh completions bash >> ~/.bashrc
+
+# Zsh
+zzh completions zsh >> ~/.zshrc
+
+# Fish
+zzh completions fish > ~/.config/fish/completions/zzh.fish
+```
+
+After adding the completions, restart your shell or source the config file to enable them.
 
 ## How It Works
 
