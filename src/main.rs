@@ -3,7 +3,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use dialoguer::console::Style;
 use dialoguer::console::Term;
 use dialoguer::theme::ColorfulTheme;
-use dialoguer::FuzzySelect;
+use dialoguer::{Confirm, FuzzySelect};
 use regex::Regex;
 use std::collections::HashMap;
 use std::env::{self, var};
@@ -114,18 +114,44 @@ fn interactive_session(
     command.arg(target);
     append_to_history(&folder, target)?;
 
-    let mut attempts = 0;
+    const MAX_AUTO_ATTEMPTS: u32 = 5;
+    let mut total_attempts: u32 = 0;
+    let mut auto_attempts_remaining: u32 = 0;
     loop {
         let status = command.status()?;
-        let exit_code = status.code().unwrap();
 
-        if status.success() && exit_code != 255 {
+        if status.success() {
             break;
         }
 
+        let exit_code = status.code().unwrap_or(-1);
+
+        if auto_attempts_remaining == 0 {
+            let prompt = if total_attempts == 0 {
+                format!("Connection to {target} ended (exit {exit_code}). Reconnect?")
+            } else {
+                format!(
+                    "Gave up after {total_attempts} attempts (exit {exit_code}). Try again?"
+                )
+            };
+
+            let should_reconnect = Confirm::new()
+                .with_prompt(prompt)
+                .default(false)
+                .interact()
+                .unwrap_or(false);
+
+            if !should_reconnect {
+                break;
+            }
+
+            auto_attempts_remaining = MAX_AUTO_ATTEMPTS;
+        }
+
+        total_attempts += 1;
+        auto_attempts_remaining -= 1;
+        println!("Reconnecting... attempt {total_attempts}");
         thread::sleep(time::Duration::from_millis(1000));
-        attempts += 1;
-        println!("Trying to reconnect... {} attempt", attempts);
     }
 
     Ok(())
