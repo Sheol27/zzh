@@ -39,17 +39,15 @@ fn extract_history(
 
     let data: Vec<(DateTime<Utc>, &str)> = s
         .lines()
-        .map(|l| {
-            let mut split = l.split(" ");
-
-            let dt_str = split
-                .next()
-                .expect("Missing timestamp while processiing history");
-            let target_str = split.next().expect("Missing host while processing history");
-
-            let now_parsed: DateTime<Utc> = dt_str.parse().unwrap();
-
-            (now_parsed, target_str)
+        .filter_map(|l| {
+            let mut split = l.split(' ');
+            let dt_str = split.next()?;
+            let target_str = split.next()?;
+            if target_str.is_empty() {
+                return None;
+            }
+            let parsed: DateTime<Utc> = dt_str.parse().ok()?;
+            Some((parsed, target_str))
         })
         .collect();
 
@@ -84,11 +82,20 @@ fn extract_hosts() -> Result<Vec<String>, Box<dyn Error>> {
     let mut s = String::new();
     file.read_to_string(&mut s)?;
 
-    let re = Regex::new(r"Host\s+(\S+)").unwrap();
+    let re = Regex::new(r"(?im)^[ \t]*Host[ \t]+(.+)$").unwrap();
 
     let hosts: Vec<String> = re
         .captures_iter(&s)
-        .filter_map(|cap| cap.get(1).map(|m| m.as_str().to_string()))
+        .filter_map(|cap| cap.get(1).map(|m| m.as_str()))
+        .flat_map(|line| {
+            line.split('#')
+                .next()
+                .unwrap_or("")
+                .split_whitespace()
+                .filter(|h| !h.contains('*') && !h.contains('?'))
+                .map(|h| h.to_string())
+                .collect::<Vec<_>>()
+        })
         .collect();
 
     Ok(hosts)
