@@ -10,6 +10,7 @@ ZZH is a cli tool that wraps SSH. It's not a drop in replacement, just a more en
 - **Connection History:** Automatically tracks your recent SSH connections for easy access.
 - **Detached Sessions:** Option to start sessions in detached mode (no interactive shell).
 - **SSH Config Integration:** Reads your existing SSH configuration from `~/.ssh/config` to list available hosts.
+- **TOML Config:** Define extra hosts, short aliases, and groups in `~/.zzh/config.toml` (see [Config file](#config-file)).
 - **Shell Completions:** Tab completion support for bash, zsh, and fish with history-aware suggestions.
 - **Simple & Fast:** Built with performance and usability in mind.
 
@@ -110,7 +111,65 @@ After adding the completions, restart your shell or source the config file to en
 - **Fuzzy Search Interface:**  
   The interactive menu allows you to search through your hosts with ease, displaying connection history with timestamps for added context.
 
+## Config file
+
+ZZH reads `~/.zzh/config.toml` on every run (a commented template is written on
+first launch). Use it to define hosts that aren't in `~/.ssh/config`, give long
+targets short aliases, and organize hosts into groups. Everything defined here
+shows up in the fuzzy menu, in `zzh --hosts`, and in shell completions.
+
+```toml
+# A host that isn't in ~/.ssh/config. Connect with `zzh db`.
+[hosts.db]
+hostname = "db.internal"                        # address ssh connects to
+user = "admin"                                  # optional -> admin@db.internal
+port = 2222                                     # optional -> -p 2222
+identity_file = "~/.ssh/id_db"                  # optional -> -i (~ expanded)
+proxy_jump = "bastion"                          # optional -> -J bastion
+options = ["StrictHostKeyChecking=accept-new"]  # optional -> repeated -o
+
+# Short names: `zzh w` connects to web1.
+[aliases]
+w = "web1"
+
+# Named host groups: `zzh @prod` scopes the menu to these members.
+[groups]
+prod = ["web1", "web2", "db"]
+```
+
+Only `hosts.<name>` keys are required to make sense; every field is optional and
+a host with no `hostname` falls back to its own name (so ssh still resolves it
+via `~/.ssh/config`). Aliases resolve to a config host, an SSH-config host, or a
+raw `user@host`.
+
+### Editing from the command line
+
+You can edit `config.toml` by hand, or let ZZH write it for you (comments and
+formatting are preserved):
+
+```bash
+# Add or update a host
+zzh add-host db --hostname db.internal --user admin --port 2222 \
+  --identity ~/.ssh/id_db --jump bastion --option StrictHostKeyChecking=accept-new
+
+# Define an alias
+zzh alias d db
+
+# Add hosts to a group (creates the group if needed)
+zzh tag prod db web1 web2
+```
+
+### Using groups
+
+```bash
+# Open the fuzzy menu scoped to a single group
+zzh @prod
+```
+
 ## Configuration
+
+- **Config file:**  
+  Hosts, aliases, and groups live in `~/.zzh/config.toml`, see [Config file](#config-file) above.
 
 - **History Storage:**  
   ZZH creates a `.zzh` folder in your home directory where it stores the connection history in a file named `history`. You can manually clear or edit this file as needed.

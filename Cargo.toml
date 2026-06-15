@@ -1,7 +1,7 @@
 [package]
 name = "zzh"
 version = "0.1.6"
-edition = "2021"
+edition = "2024"
 license = "MIT"
 authors = ["Daniel Pavalache <danielpavalache27@gmail.com>"]
 description = """
@@ -13,8 +13,11 @@ repository = "https://github.com/Sheol27/zzh"
 
 
 [dependencies]
-chrono = "0.4.39"
+chrono = "0.4.45"
 clap = { version = "4.5.28", features = ["derive"] }
-ctrlc = "3.4.5"
-dialoguer = { version = "0.11.0", features = ["fuzzy-select"] }
-regex = "1.11.1"
+ctrlc = "3.5.2"
+dialoguer = { version = "0.12.0", features = ["fuzzy-select"] }
+regex = "1.12.4"
+serde = { version = "1.0.228", features = ["derive"] }
+toml = "1.1.2"
+toml_edit = "0.25.12"
