@@ -45,6 +45,7 @@ pub fn extract_hosts() -> Result<Vec<String>, Box<dyn Error>> {
 pub fn interactive_session(
     resolved: &Resolved,
     detached: bool,
+    auto_reconnect: bool,
     folder: &Path,
 ) -> Result<(), Box<dyn Error>> {
     let mut command = std::process::Command::new("ssh");
@@ -67,7 +68,7 @@ pub fn interactive_session(
     let mut auto_attempts_remaining: u32 = 0;
     loop {
         let status = command.status()?;
-        if status.success() {
+        if status.success() || !auto_reconnect {
             break;
         }
 

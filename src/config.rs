@@ -12,6 +12,10 @@ const CONFIG_TEMPLATE: &str = r#"# zzh configuration
 # Define extra hosts, short aliases, and groups here. This file is read on
 # every run. Edit it by hand or use `zzh add-host`, `zzh alias`, and `zzh tag`.
 
+# Offer to reconnect when a session drops. On by default; set to false to exit
+# as soon as the connection ends. Must stay above the tables below.
+# auto_reconnect = true
+
 # A host that isn't in ~/.ssh/config. Connect with `zzh db`.
 # [hosts.db]
 # hostname = "db.internal"                        # address ssh connects to
@@ -30,14 +34,24 @@ const CONFIG_TEMPLATE: &str = r#"# zzh configuration
 # prod = ["web1", "web2", "db"]
 "#;
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Deserialize)]
+#[serde(default)]
 pub struct Config {
-    #[serde(default)]
     pub hosts: BTreeMap<String, HostEntry>,
-    #[serde(default)]
     pub aliases: BTreeMap<String, String>,
-    #[serde(default)]
     pub groups: BTreeMap<String, Vec<String>>,
+    pub auto_reconnect: bool,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            hosts: BTreeMap::new(),
+            aliases: BTreeMap::new(),
+            groups: BTreeMap::new(),
+            auto_reconnect: true,
+        }
+    }
 }
 
 /// A host definition; all fields optional. An entry with no `hostname` uses its
@@ -232,6 +246,17 @@ mod tests {
         assert_eq!(expand_tilde("~/.ssh/id"), "/home/u/.ssh/id");
         assert_eq!(expand_tilde("/abs/path"), "/abs/path");
         assert_eq!(expand_tilde("relative"), "relative");
+    }
+
+    #[test]
+    fn auto_reconnect_defaults_on() {
+        assert!(Config::default().auto_reconnect);
+        assert!(cfg("[aliases]\nw = \"web1\"\n").auto_reconnect);
+    }
+
+    #[test]
+    fn auto_reconnect_can_be_disabled() {
+        assert!(!cfg("auto_reconnect = false\n").auto_reconnect);
     }
 
     #[test]

@@ -160,7 +160,7 @@ pub fn run_menu(
     match selection {
         Ok(index) => {
             let resolved = resolve_target(config, &entries[index].token);
-            interactive_session(&resolved, detached, zzh_folder)?;
+            interactive_session(&resolved, detached, config.auto_reconnect, zzh_folder)?;
         }
         Err(_) => {
             let _ = Term::stderr().show_cursor();

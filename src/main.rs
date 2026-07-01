@@ -85,7 +85,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             Some(group) => run_group_menu(&zzh_folder, &config, group, cli.detached)?,
             None => {
                 let resolved = resolve_target(&config, &target);
-                interactive_session(&resolved, cli.detached, &zzh_folder)?;
+                interactive_session(&resolved, cli.detached, config.auto_reconnect, &zzh_folder)?;
             }
         },
         None => {
